@@ -12,9 +12,10 @@ library(ggrepel)
 library(ggtext)
 library(ggthemes)
 library(directlabels)
+library(sf)
 
 ################################################################################
-####  Duomenų tvarkymas
+####  Savivaldybių COVID antrinis sergamumas
 ################################################################################
 
 ### Duomenų importavimas
@@ -99,16 +100,12 @@ covid.atvejai.gyv.skaicius <- covid.atvejai.gyv.skaicius[!grepl('Nenustatyta',
 covid.atvejai.gyv.skaicius <- covid.atvejai.gyv.skaicius[!grepl('Nenustatyta',
                                                                 covid.atvejai.gyv.skaicius$sex),]
 
-################################################################################
-####  Antrinio sergamumo rodiklio skaičiavimas
-################################################################################
 
 ### Stulpelių pervadinimas
 names(covid.atvejai.gyv.skaicius)[names(covid.atvejai.gyv.skaicius) == 'incidence'] <- 'serg.incidence'
 names(covid.atvejai.gyv.skaicius)[names(covid.atvejai.gyv.skaicius) == 'pop'] <- 'serg.pop'
 
 # Duomenų sustambinimas iki savivaldybių/dienų lygmens, susumuojant COVID susirgimų ir populiacijos duomenys
-
 covid.serg <- covid.atvejai.gyv.skaicius %>% 
   group_by(municipality_name, date) %>%
   summarise(across(starts_with('serg'), sum))
@@ -119,10 +116,6 @@ covid.serg$serg <- (covid.serg$serg.incidence/covid.serg$serg.pop)*100000
 
 # Ištrinu nebereikalingus duomenys
 covid.serg <- subset(covid.serg, select = -c(serg.incidence, serg.pop))
-
-################################################################################
-####  Savivaldybių/dienų rangavimas
-################################################################################
 
 dienos <- split(covid.serg, list(covid.serg$date)) #Išskiriu atskiras dienas skaičiavimui
 
@@ -165,10 +158,6 @@ covid.serg.rang <- subset(covid.serg.rang, select = -serg) # Ištrinu nereikalin
 rangas <- aggregate(covid.serg.rang$serg.rank,
                     by = list(covid.serg.rang$municipality_name),
                     FUN = mean)
-
-################################################################################
-####  Vizualizavimas
-################################################################################
 
 # Sukuriu atskirus kintamuosius, kad paspalvinti pirmas ir paskutines 5 savivaldybes
 covid.serg.rang <- mutate(covid.serg.rang,
@@ -280,6 +269,184 @@ ggplot(covid.serg.rang, aes(x = date, y = serg.rank)) +
   theme(legend.position = "none",
         legend.title=element_blank(),
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+################################################################################
+####  2023 m. savivaldybių tarybų ir merų rinkimų II turo pašto balsų dalis
+################################################################################
+
+# Importavimas
+balsavimas <- read.csv('VN_1304_2_1920.csv')
+class(balsavimas)
+
+# Nereikalingų duomenų ištrinimas
+balsavimas <- subset(balsavimas, select = -c(APYLINKES_NR, APYLINKES_PAVADINIMAS,
+                                             RINKEJU_SKAICIUS, VISO_DALYVAVO, 
+                                             BALSADEZEJE_GALIOJANTYS, BALSADEZEJE_NEGALIOJANTYS,
+                                             PASTU_GALIOJANTYS, PASTU_NEGALIOJANTYS,
+                                             BALSU_BALSADEZEJE, PAPILDOMO_PROTOKOLO_POZYMIS,
+                                             RKND_V_AR_ISSIKELE_PATS, RPL_UNIKALUS_NUMERIS, SAV,
+                                             Sugeneravimo.data))
+
+# Kokia dalis balsų paštu
+balsavimas$pastu <- balsavimas$BALSU_PASTU/balsavimas$BALSU_VISO
+
+# Vienas stulpelis kandidatams:ėms
+balsavimas$kand <- paste(balsavimas$VARDAS, balsavimas$PAVARDE, sep = " ")
+balsavimas <- subset(balsavimas, select = -c(VARDAS, PAVARDE, BALSU_PASTU, BALSU_VISO))
+
+# Ar yra statistiškai reikšmingas skirtumas tarp dalių balsavusių paštų apygardų kandidatams
+apygarda <- split(balsavimas, list(balsavimas$APYGARDOS_NR)) #Sukuriu sąrašą iš duomenų pagal apygardą
+unique(balsavimas$APYGARDOS_NR)
+
+# Skaičiuoju, kuriose apygardose yra statistškai reikšmingas skirtumas naudojant t testą
+# Lyginu balsų procento dalį tarp kandidatų
+apygarda$`3`$p <- t.test(pastu ~ kand, apygarda$`3`)$p.value
+apygarda$`4`$p <- t.test(pastu ~ kand, apygarda$`4`)$p.value
+apygarda$`6`$p <- t.test(pastu ~ kand, apygarda$`6`)$p.value
+apygarda$`8`$p <- t.test(pastu ~ kand, apygarda$`8`)$p.value
+apygarda$`9`$p <- t.test(pastu ~ kand, apygarda$`9`)$p.value
+apygarda$`12`$p <- t.test(pastu ~ kand, apygarda$`12`)$p.value
+apygarda$`13`$p <- t.test(pastu ~ kand, apygarda$`13`)$p.value
+apygarda$`14`$p <- t.test(pastu ~ kand, apygarda$`14`)$p.value
+apygarda$`18`$p <- t.test(pastu ~ kand, apygarda$`18`)$p.value
+apygarda$`19`$p <- t.test(pastu ~ kand, apygarda$`19`)$p.value
+apygarda$`20`$p <- t.test(pastu ~ kand, apygarda$`20`)$p.value
+apygarda$`21`$p <- t.test(pastu ~ kand, apygarda$`21`)$p.value
+apygarda$`23`$p <- t.test(pastu ~ kand, apygarda$`23`)$p.value
+apygarda$`24`$p <- t.test(pastu ~ kand, apygarda$`24`)$p.value
+apygarda$`26`$p <- t.test(pastu ~ kand, apygarda$`26`)$p.value
+apygarda$`29`$p <- t.test(pastu ~ kand, apygarda$`29`)$p.value
+apygarda$`33`$p <- t.test(pastu ~ kand, apygarda$`33`)$p.value
+apygarda$`34`$p <- t.test(pastu ~ kand, apygarda$`34`)$p.value
+apygarda$`37`$p <- t.test(pastu ~ kand, apygarda$`37`)$p.value
+apygarda$`38`$p <- t.test(pastu ~ kand, apygarda$`38`)$p.value
+apygarda$`41`$p <- t.test(pastu ~ kand, apygarda$`41`)$p.value
+apygarda$`42`$p <- t.test(pastu ~ kand, apygarda$`42`)$p.value
+apygarda$`45`$p <- t.test(pastu ~ kand, apygarda$`45`)$p.value
+apygarda$`46`$p <- t.test(pastu ~ kand, apygarda$`46`)$p.value
+apygarda$`47`$p <- t.test(pastu ~ kand, apygarda$`47`)$p.value
+apygarda$`51`$p <- t.test(pastu ~ kand, apygarda$`51`)$p.value
+apygarda$`52`$p <- t.test(pastu ~ kand, apygarda$`52`)$p.value
+apygarda$`53`$p <- t.test(pastu ~ kand, apygarda$`53`)$p.value
+apygarda$`54`$p <- t.test(pastu ~ kand, apygarda$`54`)$p.value
+apygarda$`55`$p <- t.test(pastu ~ kand, apygarda$`55`)$p.value
+apygarda$`57`$p <- t.test(pastu ~ kand, apygarda$`57`)$p.value
+apygarda$`58`$p <- t.test(pastu ~ kand, apygarda$`58`)$p.value
+apygarda$`59`$p <- t.test(pastu ~ kand, apygarda$`59`)$p.value
+apygarda$`60`$p <- t.test(pastu ~ kand, apygarda$`60`)$p.value
+
+#Sujungimas
+balsavimas.p <- do.call("rbind", apygarda) # Sujungiu ranguotous duomenys kartu
+
+#Sukuriu binarinį kintamąjį, kad rodyti kurioje apygardoje yra reikšmingas skirtumas
+balsavimas.p <- mutate(balsavimas.p,
+                       reiksming = case_when(
+                         p < 0.05 ~ 1,
+                         TRUE ~ 0
+                         ))
+table(balsavimas.p$reiksming)
+
+# Palieku tik tuos duomenys, kurie bus reikalingi duomenų sujungimui
+balsavimas.p <- subset(balsavimas.p, select = -c(APYGARDOS_NR, APYGARDOS_PAVADINIMAS, pastu, PARTIJA))
+
+#Eksperimentavimas
+#ttest <- t.test(pastu ~ kand, apygarda$`3`)
+#rm(ttest)
+#max(unlist(ttest$estimate), na.rm=FALSE)
+
+# Paskaičiuoju kandidatų pašto balsų dalies vidurkius
+balsavimas.mean <- balsavimas %>% 
+  group_by(APYGARDOS_NR, APYGARDOS_PAVADINIMAS, kand, PARTIJA) %>%
+  summarise(across(starts_with('pastu'), mean))
+
+# Kiekvienoje apygardoje palieku duomenų eilutė su didžiausią balsavimo paštu dalimi
+balsavimas.max <- aggregate(pastu ~ APYGARDOS_NR + APYGARDOS_PAVADINIMAS, balsavimas.mean, max)
+
+# Pridedu stulpęlį su kandidatų vardais prie duomenų
+balsavimas.max <- merge(balsavimas.max, balsavimas.mean, all.x = TRUE,
+                                    by=c("APYGARDOS_NR", "APYGARDOS_PAVADINIMAS", "pastu"))
+
+# Pridedu reikšmingumo stulpelius prie balsavimo duomenų
+unique(balsavimas.p$kand)
+balsavimas.p <- balsavimas.p %>% 
+  group_by(kand) %>%
+  summarise_each(funs(mean))
+
+balsavimas.max <- merge(balsavimas.max, balsavimas.p, all.x = TRUE, by="kand") #Visi duomenys dabar sujungti
+
+#SHAPE duomenų įkėlimas
+shape.data <- st_read("apgardos.dbf")
+
+# Pridedu balsavimo bei kandidatų duomenys prie geografinių duomenų
+names(shape.data)[names(shape.data) == 'apg_nr'] <- 'APYGARDOS_NR'
+shape.data <- merge(shape.data, balsavimas.max, all.x = TRUE, by="APYGARDOS_NR")
+
+# Partijų trumpiniai
+unique(shape.data$PARTIJA)
+shape.data$PARTIJA <- recode(shape.data$PARTIJA,
+                  "Tėvynės sąjunga-Lietuvos krikščionys demokratai" = "TS-LKD",
+                  "Lietuvos socialdemokratų partija" = "LSDP",
+                  "Politinis komitetas „Kartu už Utenos kraštą“" = "PK KUK",
+                  "Politinis komitetas „Drauge su Jumis“" = "PK DJ",
+                  "Lietuvos lenkų rinkimų akcija-Krikščioniškų šeimų sąjunga" = "LLRA-KSS",
+                  "Lietuvos valstiečių ir žaliųjų sąjunga" = "LVZS",
+                  "Darbo partija" = "DP",
+                  "Krikščionių sąjunga" = "KS",
+                  "Liberalų sąjūdis" = "LRLS",
+                  "Lietuvos regionų partija" = "LRP",
+                  "Demokratų sąjunga „Vardan Lietuvos“" = "DSVL",
+                  )
+table(shape.data$PARTIJA)
+
+# Partijų trumpiniai pridedami prie kandidatų vardų
+shape.data$kand <- paste(shape.data$kand, shape.data$PARTIJA, sep = " ")
+
+#Ištrinų kandidatų vardus, kurie neturi reikšmingo skirtumo
+shape.data <- mutate(shape.data,
+                     kand = case_when(
+                       reiksming==1 ~ kand,
+                       reiksming==0 ~ NA,
+                       TRUE ~ NA))
+
+#Ištrinu partijų pavadinimus iš eilučių, kur nėra reikšmingo skirtumo
+shape.data <- mutate(shape.data,
+                     PARTIJA = case_when(
+                       reiksming==1 ~ PARTIJA,
+                       reiksming==0 ~ NA,
+                       TRUE ~ NA))
+
+# Reikšmingumo kintamojo perkodavimas į linijų pločio matą
+shape.data$reiksming <- replace_na(shape.data$reiksming, 0)
+shape.data$reiksming <- recode(shape.data$reiksming,
+                               `1` = 1.25,
+                               `0` = 0)
+
+# Kintamųjų patikrinimas prieš vaizduojant
+table(shape.data$reiksming)
+unique(shape.data$PARTIJA)
+unique(shape.data$kand)
+
+# Duomenų surangavimas pagal reikšmingumą
+shape.data <- shape.data[order(shape.data$reiksming),]
+
+# Žemėlapio vizualizavimas
+ggplot(data = shape.data) +
+  geom_sf(aes(fill = pastu, color=factor(reiksming)), lwd = shape.data$reiksming) +
+  geom_label_repel(data = shape.data, aes(label = kand, geometry = geometry),
+                   stat = "sf_coordinates", min.segment.length = 0, size = 2.5) +
+  scale_color_manual(values=c("black", "#f94144"),
+                     name="Statistiškai reikšmingas\nskirtumas tarp kandidatų\nbalsų dalių paštu",
+                     labels=c("Nereikšmingas", "t-testas p < 0.05")) +
+  scale_fill_gradient(low = "azure2", high = "deepskyblue4",
+                      name="Didžiausia vidutinė\napylinkių balsų dalis\npaštu tarp kandidatų") +
+  theme_void()
+
+
+
+
+
+
+
 
 
 
